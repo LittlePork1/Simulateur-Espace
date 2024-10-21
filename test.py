@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 import tkinter as tk
-from tkinter import simpledialog, messagebox
+from tkinter import simpledialog
 
 # Constante gravitationnelle (en km^3 kg^(-1) s^(-2))
 G = 6.67430e-20  # Convertie en km^3/kg/s^2
@@ -139,7 +139,7 @@ def run_simulation():
                     force_moyenne[corps.nom][250] = np.linalg.norm(corps.force)
 
     # Tracer des trajectoires
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(16, 9))  # Adapter la taille de la figure pour 1920x1080
 
     for corps in corps_celestes:
         if corps.nom != "Soleil":
@@ -153,10 +153,8 @@ def run_simulation():
     plt.ylabel('Position Y (millions de km)')
     plt.grid()
 
-    plt.show()
-
-    # Tableau des valeurs à t = 20 jours et t = 250 jours
-    fig_tableau = plt.figure(figsize=(14, 7))  # Taille de la figure ajustée
+    # Créer le tableau des valeurs
+    fig_tableau = plt.figure(figsize=(16, 6))  # Taille de la figure ajustée pour le tableau
     table_data = []
     headers = ["Corps", "Vitesse à 20 jours (km/s)", "Force à 20 jours (N)", "Vitesse à 250 jours (km/s)", "Force à 250 jours (N)"]
     table_data.append(headers)
@@ -167,7 +165,7 @@ def run_simulation():
             f_20 = force_moyenne[corps.nom][20]
             v_250 = vitesse_moyenne[corps.nom][250]
             f_250 = force_moyenne[corps.nom][250]
-            
+
             table_data.append([
                 corps.nom,
                 f"{v_20:.2f}" if v_20 is not None else "N/A",
@@ -177,12 +175,13 @@ def run_simulation():
             ])
 
     # Créer le tableau
-    table = plt.table(cellText=table_data, loc='center', cellLoc='center', colWidths=[0.2, 0.2, 0.25, 0.2, 0.25])
+    table = plt.table(cellText=table_data, loc='center', cellLoc='center', colWidths=[0.15, 0.2, 0.2, 0.2, 0.2])
     table.auto_set_font_size(False)
-    table.set_fontsize(12)  # Ajuster la taille de la police si nécessaire
-    table.scale(1.3, 1.3)  # Ajuster l'échelle pour mieux utiliser l'espace (ajouter un peu plus d'espace)
+    table.set_fontsize(12)  # Ajuster la taille de la police
+    table.scale(1.2, 1.2)  # Ajuster l'échelle pour mieux utiliser l'espace
 
     plt.axis('off')  # Ne pas afficher les axes
+    plt.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)  # Ajuster les marges
     plt.show()
 
 # Créer la fenêtre principale
