@@ -1,8 +1,19 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import re
 
 # Constante gravitationnelle (en km^3 kg^(-1) s^(-2))
 G = 6.67430e-20  # Convertie en km^3/kg/s^2
+M_SOLEIL = 1.989e30  # Masse du Soleil en kg
+
+# Fonction pour convertir l'entrée de l'utilisateur en un nombre flottant interprétant la notation scientifique
+def convertir_entree_scientifique(entree):
+    # Remplacer les variantes de notation comme "× 10^" par "e"
+    entree = re.sub(r'[×x]\s*10\^?', 'e', entree)  # Remplace '× 10^' par 'e'
+    try:
+        return float(entree)
+    except ValueError:
+        raise ValueError(f"Impossible de convertir l'entrée '{entree}' en nombre.")
 
 # Classe pour représenter un objet céleste
 class Corps:
@@ -39,22 +50,52 @@ class Corps:
         self.position += self.vitesse * dt
         self.temps_ecoule += dt  # Augmenter le temps écoulé
 
-    def a_retrouve_position_initiale(self):
-        return np.allclose(self.position, self.position_initiale, atol=1e5)  # Tolérance pour position initiale
+# Fonction pour calculer la distance au Soleil en fonction de la période orbitale
+def calculer_distance_orbitale(periode_orbitale_jours):
+    periode_orbitale_secondes = periode_orbitale_jours * 24 * 3600
+    # En utilisant la 3e loi de Kepler pour les orbites circulaires
+    distance_orbitale_km = (G * M_SOLEIL * (periode_orbitale_secondes**2) / (4 * np.pi**2))**(1/3)
+    return distance_orbitale_km
 
-# Créer les corps célestes (Soleil, planètes, etc.)
+# Fonction pour calculer la vitesse orbitale circulaire
+def calculer_vitesse_orbitale(distance_orbitale_km):
+    return np.sqrt(G * M_SOLEIL / distance_orbitale_km)
+
+# Fonction pour entrer les données manuellement
+def entrer_corps():
+    nom = input("Entrez le nom de la planète : ")
+    masse_str = input(f"Entrez la masse de {nom} (ex: 5,972 × 10^24 kg) : ")
+    masse = convertir_entree_scientifique(masse_str)
+    
+    periode_orbitale_jours = float(input(f"Entrez la période orbitale de {nom} (en jours) : "))
+    
+    # Calculer la distance orbitale et la vitesse correspondante
+    distance_orbitale_km = calculer_distance_orbitale(periode_orbitale_jours)
+    vitesse_orbitale_kms = calculer_vitesse_orbitale(distance_orbitale_km)
+    
+    # On suppose que la planète commence à (distance_orbitale, 0) et que sa vitesse est perpendiculaire
+    position = [distance_orbitale_km, 0]
+    vitesse = [0, vitesse_orbitale_kms]
+    
+    temps_simulation = periode_orbitale_jours * 24 * 3600  # Conversion de la période en secondes
+
+    return Corps(nom, masse, position, vitesse, periode_orbitale_jours * 24 * 3600, temps_simulation)
+
+# Entrer manuellement les corps
+corps_celestes = []
+nombre_corps = int(input("Combien de planètes voulez-vous ajouter (hors Soleil) ? "))
+
+# Soleil
 soleil = Corps("Soleil", masse=1.989e30, position=[0, 0], vitesse=[0, 0], periode_orbitale=np.inf, temps_de_simulation=np.inf)
-terre = Corps("Terre", masse=5.972e24, position=[1.496e8, 0], vitesse=[0, 29.78], periode_orbitale=365*24*3600, temps_de_simulation=365*24*3600)  # 1 an
-mars = Corps("Mars", masse=6.4171e23, position=[2.279e8, 0], vitesse=[0, 24.077], periode_orbitale=687*24*3600, temps_de_simulation=687*24*3600)  # 687 jours
-venus = Corps("Vénus", masse=4.867e24, position=[1.082e8, 0], vitesse=[0, 35.02], periode_orbitale=225*24*3600, temps_de_simulation=225*24*3600)  # 225 jours
-jupiter = Corps("Jupiter", masse=1.898e27, position=[7.785e8, 0], vitesse=[0, 13.07], periode_orbitale=4333*24*3600, temps_de_simulation=4333*24*3600)  # 4333 jours
+corps_celestes.append(soleil)
 
-# Liste des corps dans le système
-corps_celestes = [soleil, terre, mars, venus, jupiter]
+# Ajouter les planètes
+for _ in range(nombre_corps):
+    corps_celestes.append(entrer_corps())
 
 # Paramètres de la simulation
-dt = 4 * 3600  # Pas de temps (1 jour)
-intervalle_enregistrement = 60  # Enregistrer les positions tous les 120 jours pour réduire les points
+dt = 3600  # Pas de temps (1 heure)
+intervalle_enregistrement = 24  # Enregistrer les positions tous les 24 heures
 
 # Stocker les positions pour tracer
 positions = {corps.nom: [] for corps in corps_celestes}
@@ -63,19 +104,18 @@ force_moyenne = {corps.nom: {20: None, 250: None} for corps in corps_celestes if
 
 # Boucle de simulation
 for step in range(int((12 * 365 * 24 * 3600) // dt)):  # Simulation pour un maximum de 12 ans
-    temps_courant = step * dt
-
     for corps in corps_celestes:
         corps.maj_force(corps_celestes)
 
     for corps in corps_celestes:
         corps.maj_position_et_vitesse(dt)
 
-        # Enregistrer les positions tous les 120 jours
-        if step % (intervalle_enregistrement) == 0:  # Enregistrer toutes les 120 jours
+        # Enregistrer les positions
+        if step % (intervalle_enregistrement) == 0:
             positions[corps.nom].append(corps.position.copy())
 
         # Enregistrer les valeurs si le temps courant est proche des moments d'intérêt
+        temps_courant = step * dt
         if corps.nom != "Soleil":
             if temps_courant == 20 * 24 * 3600:
                 vitesse_moyenne[corps.nom][20] = np.linalg.norm(corps.vitesse)
@@ -85,21 +125,14 @@ for step in range(int((12 * 365 * 24 * 3600) // dt)):  # Simulation pour un maxi
                 vitesse_moyenne[corps.nom][250] = np.linalg.norm(corps.vitesse)
                 force_moyenne[corps.nom][250] = np.linalg.norm(corps.force)
 
-    # Arrêter la simulation pour Mars après un an
-    if mars.temps_ecoule >= mars.temps_de_simulation:  # Si Mars a atteint 687 jours
-        mars.position = mars.position_initiale  # Ramener Mars à sa position initiale
-        mars.temps_ecoule = 0  # Réinitialiser le temps écoulé pour Mars
-
-# Créer une nouvelle figure pour le graphique
+# Tracer des trajectoires
 plt.figure(figsize=(12, 6))
 
-# Tracé des trajectoires avec des points espacés
 for corps in corps_celestes:
-    if corps.nom != "Soleil":  # Pas besoin de tracer l'orbite du Soleil
+    if corps.nom != "Soleil":
         positions_arr = np.array(positions[corps.nom])
-        plt.plot(positions_arr[:, 0] / 1e6, positions_arr[:, 1] / 1e6, 'o-', label=corps.nom, markersize=4)  # En millions de km
+        plt.plot(positions_arr[:, 0] / 1e6, positions_arr[:, 1] / 1e6, 'o-', label=corps.nom, markersize=4)
 
-# Tracé du Soleil avec contour pour le rendre plus visible
 plt.scatter([0], [0], color='yellow', edgecolor='black', s=300, label='Soleil')
 plt.legend()
 plt.title('Simulation du système solaire simplifié avec trajectoires')
@@ -107,21 +140,16 @@ plt.xlabel('Position X (millions de km)')
 plt.ylabel('Position Y (millions de km)')
 plt.grid()
 
-# Affichage du graphique
-plt.show(block=False)  # Affiche le graphique sans bloquer l'exécution
+plt.show(block=False)
 
-# Créer une nouvelle figure pour le tableau des valeurs
-fig_tableau = plt.figure(figsize=(10, 5))  # Taille ajustée
-
-# Affichage des données à t = 20 jours et t = 250 jours
+# Tableau des valeurs à t = 20 jours et t = 250 jours
+fig_tableau = plt.figure(figsize=(14, 7))  # Taille de la figure ajustée
 table_data = []
-# Une seule ligne d'en-tête
 headers = ["Corps", "Vitesse à 20 jours (km/s)", "Force à 20 jours (N)", "Vitesse à 250 jours (km/s)", "Force à 250 jours (N)"]
 table_data.append(headers)
 
-# Préparation des colonnes de données
 for corps in corps_celestes:
-    if corps.nom != "Soleil":  # Pas besoin d'inclure le Soleil
+    if corps.nom != "Soleil":
         v_20 = vitesse_moyenne[corps.nom][20]
         f_20 = force_moyenne[corps.nom][20]
         v_250 = vitesse_moyenne[corps.nom][250]
@@ -135,15 +163,14 @@ for corps in corps_celestes:
             f"{f_250:.2e}" if f_250 is not None else "N/A"
         ])
 
-# Créer un tableau avec matplotlib
-table = plt.table(cellText=table_data, colLabels=None, loc='center', cellLoc='center', colWidths=[0.2, 0.2, 0.25, 0.2, 0.25])
+# Créer le tableau
+table = plt.table(cellText=table_data, loc='center', cellLoc='center', colWidths=[0.2, 0.2, 0.25, 0.2, 0.25])
 table.auto_set_font_size(False)
-table.set_fontsize(8)  # Réduire la taille de la police
-table.scale(1.2, 1.2)  # Réduire l'échelle du tableau pour mieux s'adapter
-plt.axis('off')
+table.set_fontsize(12)  # Ajuster la taille de la police si nécessaire
+table.scale(1.3, 1.3)  # Ajuster l'échelle pour mieux utiliser l'espace (ajouter un peu plus d'espace)
 
-# Affichage du tableau
-plt.show(block=False)  # Affiche le tableau sans bloquer l'exécution
+plt.axis('off')  # Ne pas afficher les axes
+plt.show()
 
-# Garder le script en cours d'exécution pour voir les fenêtres
-input("Appuyez sur Entrée pour fermer les fenêtres...")
+# Pour empêcher la fermeture immédiate de la fenêtre
+input("Appuyez sur Entrée pour fermer...")
