@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import re
+import tkinter as tk
+from tkinter import simpledialog, messagebox
 
 # Constante gravitationnelle (en km^3 kg^(-1) s^(-2))
 G = 6.67430e-20  # Convertie en km^3/kg/s^2
@@ -61,13 +63,21 @@ def calculer_distance_orbitale(periode_orbitale_jours):
 def calculer_vitesse_orbitale(distance_orbitale_km):
     return np.sqrt(G * M_SOLEIL / distance_orbitale_km)
 
-# Fonction pour entrer les données manuellement
+# Fonction pour entrer les données manuellement via Tkinter
 def entrer_corps():
-    nom = input("Entrez le nom de la planète : ")
-    masse_str = input(f"Entrez la masse de {nom} (ex: 5,972 × 10^24 kg) : ")
+    nom = simpledialog.askstring("Input", "Entrez le nom de la planète :")
+    if not nom:
+        return None
+    
+    masse_str = simpledialog.askstring("Input", f"Entrez la masse de {nom} (ex: 5,972 × 10^24 kg) :")
+    if not masse_str:
+        return None
     masse = convertir_entree_scientifique(masse_str)
     
-    periode_orbitale_jours = float(input(f"Entrez la période orbitale de {nom} (en jours) : "))
+    periode_orbitale_jours_str = simpledialog.askstring("Input", f"Entrez la période orbitale de {nom} (en jours) :")
+    if not periode_orbitale_jours_str:
+        return None
+    periode_orbitale_jours = float(periode_orbitale_jours_str)
     
     # Calculer la distance orbitale et la vitesse correspondante
     distance_orbitale_km = calculer_distance_orbitale(periode_orbitale_jours)
@@ -81,96 +91,106 @@ def entrer_corps():
 
     return Corps(nom, masse, position, vitesse, periode_orbitale_jours * 24 * 3600, temps_simulation)
 
-# Entrer manuellement les corps
-corps_celestes = []
-nombre_corps = int(input("Combien de planètes voulez-vous ajouter (hors Soleil) ? "))
+# Fonction principale pour exécuter la simulation
+def run_simulation():
+    corps_celestes = []
+    nombre_corps = simpledialog.askinteger("Input", "Combien de planètes voulez-vous ajouter (hors Soleil) ?")
 
-# Soleil
-soleil = Corps("Soleil", masse=1.989e30, position=[0, 0], vitesse=[0, 0], periode_orbitale=np.inf, temps_de_simulation=np.inf)
-corps_celestes.append(soleil)
+    # Soleil
+    soleil = Corps("Soleil", masse=1.989e30, position=[0, 0], vitesse=[0, 0], periode_orbitale=np.inf, temps_de_simulation=np.inf)
+    corps_celestes.append(soleil)
 
-# Ajouter les planètes
-for _ in range(nombre_corps):
-    corps_celestes.append(entrer_corps())
+    # Ajouter les planètes
+    for _ in range(nombre_corps):
+        corps = entrer_corps()
+        if corps:
+            corps_celestes.append(corps)
 
-# Paramètres de la simulation
-dt = 3600  # Pas de temps (1 heure)
-intervalle_enregistrement = 24  # Enregistrer les positions tous les 24 heures
+    # Paramètres de la simulation
+    dt = 3600  # Pas de temps (1 heure)
+    intervalle_enregistrement = 24  # Enregistrer les positions tous les 24 heures
 
-# Stocker les positions pour tracer
-positions = {corps.nom: [] for corps in corps_celestes}
-vitesse_moyenne = {corps.nom: {20: None, 250: None} for corps in corps_celestes if corps.nom != "Soleil"}
-force_moyenne = {corps.nom: {20: None, 250: None} for corps in corps_celestes if corps.nom != "Soleil"}
+    # Stocker les positions pour tracer
+    positions = {corps.nom: [] for corps in corps_celestes}
+    vitesse_moyenne = {corps.nom: {20: None, 250: None} for corps in corps_celestes if corps.nom != "Soleil"}
+    force_moyenne = {corps.nom: {20: None, 250: None} for corps in corps_celestes if corps.nom != "Soleil"}
 
-# Boucle de simulation
-for step in range(int((12 * 365 * 24 * 3600) // dt)):  # Simulation pour un maximum de 12 ans
+    # Boucle de simulation
+    for step in range(int((12 * 365 * 24 * 3600) // dt)):  # Simulation pour un maximum de 12 ans
+        for corps in corps_celestes:
+            corps.maj_force(corps_celestes)
+
+        for corps in corps_celestes:
+            corps.maj_position_et_vitesse(dt)
+
+            # Enregistrer les positions
+            if step % (intervalle_enregistrement) == 0:
+                positions[corps.nom].append(corps.position.copy())
+
+            # Enregistrer les valeurs si le temps courant est proche des moments d'intérêt
+            temps_courant = step * dt
+            if corps.nom != "Soleil":
+                if temps_courant == 20 * 24 * 3600:
+                    vitesse_moyenne[corps.nom][20] = np.linalg.norm(corps.vitesse)
+                    force_moyenne[corps.nom][20] = np.linalg.norm(corps.force)
+
+                if temps_courant == 250 * 24 * 3600:
+                    vitesse_moyenne[corps.nom][250] = np.linalg.norm(corps.vitesse)
+                    force_moyenne[corps.nom][250] = np.linalg.norm(corps.force)
+
+    # Tracer des trajectoires
+    plt.figure(figsize=(12, 6))
+
     for corps in corps_celestes:
-        corps.maj_force(corps_celestes)
-
-    for corps in corps_celestes:
-        corps.maj_position_et_vitesse(dt)
-
-        # Enregistrer les positions
-        if step % (intervalle_enregistrement) == 0:
-            positions[corps.nom].append(corps.position.copy())
-
-        # Enregistrer les valeurs si le temps courant est proche des moments d'intérêt
-        temps_courant = step * dt
         if corps.nom != "Soleil":
-            if temps_courant == 20 * 24 * 3600:
-                vitesse_moyenne[corps.nom][20] = np.linalg.norm(corps.vitesse)
-                force_moyenne[corps.nom][20] = np.linalg.norm(corps.force)
+            positions_arr = np.array(positions[corps.nom])
+            plt.plot(positions_arr[:, 0] / 1e6, positions_arr[:, 1] / 1e6, 'o-', label=corps.nom, markersize=4)
 
-            if temps_courant == 250 * 24 * 3600:
-                vitesse_moyenne[corps.nom][250] = np.linalg.norm(corps.vitesse)
-                force_moyenne[corps.nom][250] = np.linalg.norm(corps.force)
+    plt.scatter([0], [0], color='yellow', edgecolor='black', s=300, label='Soleil')
+    plt.legend()
+    plt.title('Simulation du système solaire simplifié avec trajectoires')
+    plt.xlabel('Position X (millions de km)')
+    plt.ylabel('Position Y (millions de km)')
+    plt.grid()
 
-# Tracer des trajectoires
-plt.figure(figsize=(12, 6))
+    plt.show()
 
-for corps in corps_celestes:
-    if corps.nom != "Soleil":
-        positions_arr = np.array(positions[corps.nom])
-        plt.plot(positions_arr[:, 0] / 1e6, positions_arr[:, 1] / 1e6, 'o-', label=corps.nom, markersize=4)
+    # Tableau des valeurs à t = 20 jours et t = 250 jours
+    fig_tableau = plt.figure(figsize=(14, 7))  # Taille de la figure ajustée
+    table_data = []
+    headers = ["Corps", "Vitesse à 20 jours (km/s)", "Force à 20 jours (N)", "Vitesse à 250 jours (km/s)", "Force à 250 jours (N)"]
+    table_data.append(headers)
 
-plt.scatter([0], [0], color='yellow', edgecolor='black', s=300, label='Soleil')
-plt.legend()
-plt.title('Simulation du système solaire simplifié avec trajectoires')
-plt.xlabel('Position X (millions de km)')
-plt.ylabel('Position Y (millions de km)')
-plt.grid()
+    for corps in corps_celestes:
+        if corps.nom != "Soleil":
+            v_20 = vitesse_moyenne[corps.nom][20]
+            f_20 = force_moyenne[corps.nom][20]
+            v_250 = vitesse_moyenne[corps.nom][250]
+            f_250 = force_moyenne[corps.nom][250]
+            
+            table_data.append([
+                corps.nom,
+                f"{v_20:.2f}" if v_20 is not None else "N/A",
+                f"{f_20:.2e}" if f_20 is not None else "N/A",
+                f"{v_250:.2f}" if v_250 is not None else "N/A",
+                f"{f_250:.2e}" if f_250 is not None else "N/A"
+            ])
 
-plt.show(block=False)
+    # Créer le tableau
+    table = plt.table(cellText=table_data, loc='center', cellLoc='center', colWidths=[0.2, 0.2, 0.25, 0.2, 0.25])
+    table.auto_set_font_size(False)
+    table.set_fontsize(12)  # Ajuster la taille de la police si nécessaire
+    table.scale(1.3, 1.3)  # Ajuster l'échelle pour mieux utiliser l'espace (ajouter un peu plus d'espace)
 
-# Tableau des valeurs à t = 20 jours et t = 250 jours
-fig_tableau = plt.figure(figsize=(14, 7))  # Taille de la figure ajustée
-table_data = []
-headers = ["Corps", "Vitesse à 20 jours (km/s)", "Force à 20 jours (N)", "Vitesse à 250 jours (km/s)", "Force à 250 jours (N)"]
-table_data.append(headers)
+    plt.axis('off')  # Ne pas afficher les axes
+    plt.show()
 
-for corps in corps_celestes:
-    if corps.nom != "Soleil":
-        v_20 = vitesse_moyenne[corps.nom][20]
-        f_20 = force_moyenne[corps.nom][20]
-        v_250 = vitesse_moyenne[corps.nom][250]
-        f_250 = force_moyenne[corps.nom][250]
-        
-        table_data.append([
-            corps.nom,
-            f"{v_20:.2f}" if v_20 is not None else "N/A",
-            f"{f_20:.2e}" if f_20 is not None else "N/A",
-            f"{v_250:.2f}" if v_250 is not None else "N/A",
-            f"{f_250:.2e}" if f_250 is not None else "N/A"
-        ])
+# Créer la fenêtre principale
+root = tk.Tk()
+root.withdraw()  # Cacher la fenêtre principale
 
-# Créer le tableau
-table = plt.table(cellText=table_data, loc='center', cellLoc='center', colWidths=[0.2, 0.2, 0.25, 0.2, 0.25])
-table.auto_set_font_size(False)
-table.set_fontsize(12)  # Ajuster la taille de la police si nécessaire
-table.scale(1.3, 1.3)  # Ajuster l'échelle pour mieux utiliser l'espace (ajouter un peu plus d'espace)
+# Lancer la simulation
+run_simulation()
 
-plt.axis('off')  # Ne pas afficher les axes
-plt.show()
-
-# Pour empêcher la fermeture immédiate de la fenêtre
-input("Appuyez sur Entrée pour fermer...")
+# Fermer l'application après la simulation
+root.destroy()
