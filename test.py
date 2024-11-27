@@ -1,9 +1,12 @@
+#IMPORTATION DES BIBLIOTHEQUES
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+from matplotlib.animation import FuncAnimation
 import re
 import tkinter as tk
 from tkinter import simpledialog
-from matplotlib.animation import FuncAnimation
+from PIL import Image, ImageOps
 
 # Constante gravitationnelle (en km^3 kg^(-1) s^(-2))
 G = 6.67430e-20  # Convertie en km^3/kg/s^2
@@ -19,27 +22,25 @@ def convertir_entree_scientifique(entree):
 
 # Classe pour représenter un objet céleste
 class Corps:
-    def __init__(self, nom, masse, position, vitesse):
+    def __init__(self, nom, masse, position, vitesse, couleur, texture=None):
         self.nom = nom
         self.masse = masse
         self.position = np.array(position, dtype='float64')
         self.vitesse = np.array(vitesse, dtype='float64')
         self.force = np.array([0.0, 0.0], dtype='float64')
+        self.couleur = couleur
+        self.texture = texture  # Image de texture si disponible
 
     def maj_force(self, autres_corps):
         self.force = np.array([0.0, 0.0], dtype='float64')
-        
         for autre in autres_corps:
             if autre != self:
                 delta_pos = autre.position - self.position
                 distance = np.linalg.norm(delta_pos)
-                
                 if distance == 0:
                     continue
-
                 force_magnitude = G * self.masse * autre.masse / distance**2
                 force_direction = delta_pos / distance
-                
                 self.force += force_magnitude * force_direction
 
     def maj_position_et_vitesse(self, dt):
@@ -47,7 +48,7 @@ class Corps:
         self.vitesse += acceleration * dt
         self.position += self.vitesse * dt
 
-# Fonction pour calculer la distance au Soleil en fonction de la période orbitale
+# Fonction pour calculer la distance orbitale en fonction de la période orbitale
 def calculer_distance_orbitale(periode_orbitale_jours):
     periode_orbitale_secondes = periode_orbitale_jours * 24 * 3600
     distance_orbitale_km = (G * M_SOLEIL * (periode_orbitale_secondes**2) / (4 * np.pi**2))**(1/3)
@@ -57,139 +58,90 @@ def calculer_distance_orbitale(periode_orbitale_jours):
 def calculer_vitesse_orbitale(distance_orbitale_km):
     return np.sqrt(G * M_SOLEIL / distance_orbitale_km)
 
-# Fonction pour entrer les données manuellement via Tkinter
+# Chargement des textures
+def charger_texture(chemin, taille):
+    image = Image.open(chemin)
+    image = ImageOps.fit(image, (taille, taille), Image.ANTIALIAS)
+    return np.array(image)
+
+# Fonction pour entrer les données via Tkinter
 def entrer_corps():
     nom = simpledialog.askstring("Input", "Entrez le nom de la planète :")
     if not nom:
         return None
-    
     masse_str = simpledialog.askstring("Input", f"Entrez la masse de {nom} (ex: 5,972 × 10^24 kg) :")
     if not masse_str:
         return None
     masse = convertir_entree_scientifique(masse_str)
-    
     periode_orbitale_jours_str = simpledialog.askstring("Input", f"Entrez la période orbitale de {nom} (en jours) :")
     if not periode_orbitale_jours_str:
         return None
     periode_orbitale_jours = float(periode_orbitale_jours_str)
-    
-    # Calculer la distance orbitale et la vitesse correspondante
     distance_orbitale_km = calculer_distance_orbitale(periode_orbitale_jours)
     vitesse_orbitale_kms = calculer_vitesse_orbitale(distance_orbitale_km)
-    
-    # On suppose que la planète commence à (distance_orbitale, 0) et que sa vitesse est perpendiculaire
     position = [distance_orbitale_km, 0]
     vitesse = [0, vitesse_orbitale_kms]
-    
-    return Corps(nom, masse, position, vitesse)
+    couleur = simpledialog.askstring("Input", f"Entrez une couleur pour {nom} (ex: 'blue', 'green', etc.) :")
+    return Corps(nom, masse, position, vitesse, couleur)
 
-# Fonction principale pour exécuter la simulation
+# Fonction principale pour la simulation
 def run_simulation():
     corps_celestes = []
     nombre_corps = simpledialog.askinteger("Input", "Combien de planètes voulez-vous ajouter (hors Soleil) ?")
 
     # Soleil
-    soleil = Corps("Soleil", masse=M_SOLEIL, position=[0, 0], vitesse=[0, 0])
+    soleil_texture = charger_texture("textures/soleil.png", 300)
+    soleil = Corps("Soleil", masse=M_SOLEIL, position=[0, 0], vitesse=[0, 0], couleur='yellow', texture=soleil_texture)
     corps_celestes.append(soleil)
 
-    # Ajouter les planètes
     for _ in range(nombre_corps):
         corps = entrer_corps()
         if corps:
             corps_celestes.append(corps)
 
-    # Paramètres de la simulation
+    # Simulation
     dt = 432000  # Pas de temps (5 jours)
-    total_steps = int((12 * 365 * 24 * 3600) // dt)  # Simulation pour 12 ans
+    total_steps = 500
     positions = {corps.nom: [] for corps in corps_celestes}
 
-    # Initialiser les données pour le tableau
-    vitesse_moyenne = {corps.nom: {20: None, 250: None} for corps in corps_celestes if corps.nom != "Soleil"}
-    force_moyenne = {corps.nom: {20: None, 250: None} for corps in corps_celestes if corps.nom != "Soleil"}
-
-    # Tracer des trajectoires avec animation
-    fig, ax = plt.subplots(figsize=(16, 9))  # Adapter la taille de la figure pour 1920x1080
-    ax.set_xlim(-1.5e9, 1.5e9)  # Limites x en km
-    ax.set_ylim(-1.5e9, 1.5e9)  # Limites y en km
-    ax.set_title('Simulation du système solaire avec trajectoires animées')
-    ax.set_xlabel('Position X (km)')
-    ax.set_ylabel('Position Y (km)')
+    # Plot setup
+    fig, ax = plt.subplots(figsize=(12, 12))
+    ax.set_xlim(-1.5e9, 1.5e9)
+    ax.set_ylim(-1.5e9, 1.5e9)
+    ax.set_title("Simulation du Système Solaire", fontsize=16)
+    ax.set_xlabel("Position X (km)", fontsize=12)
+    ax.set_ylabel("Position Y (km)", fontsize=12)
     ax.grid()
 
-    # Initialiser les graphiques pour les corps célestes
-    scatters = {corps.nom: ax.plot([], [], 'o-', label=corps.nom, markersize=4)[0] for corps in corps_celestes if corps.nom != "Soleil"}
-    ax.scatter([0], [0], color='yellow', edgecolor='black', s=300, label='Soleil')
+    # Halo du Soleil
+    ax.add_artist(Circle((0, 0), 1e8, color='yellow', alpha=0.3))
 
-    plt.legend()
-
-    # Fonction d'initialisation pour l'animation
+    # Animations
     def init():
-        for scatter in scatters.values():
-            scatter.set_data([], [])
-        return scatters.values()
+        for corps in corps_celestes:
+            if corps.texture is not None:
+                ax.imshow(corps.texture, extent=(-1e8, 1e8, -1e8, 1e8))
+        return []
 
-    # Fonction d'animation
     def update(frame):
-        # Mettre à jour les forces et les positions de chaque corps céleste
         for corps in corps_celestes:
             corps.maj_force(corps_celestes)
             corps.maj_position_et_vitesse(dt)
-            positions[corps.nom].append(corps.position.copy())  # Enregistrer la position
-
-            # Enregistrer les valeurs si le temps courant est proche des moments d'intérêt
-            temps_courant = frame * dt
-            if corps.nom != "Soleil":
-                if temps_courant == 20 * 24 * 3600:
-                    vitesse_moyenne[corps.nom][20] = np.linalg.norm(corps.vitesse)
-                    force_moyenne[corps.nom][20] = np.linalg.norm(corps.force)
-
-                if temps_courant == 250 * 24 * 3600:
-                    vitesse_moyenne[corps.nom][250] = np.linalg.norm(corps.vitesse)
-                    force_moyenne[corps.nom][250] = np.linalg.norm(corps.force)
-
-        # Mettre à jour les positions des corps célestes pour l'animation
+            positions[corps.nom].append(corps.position.copy())
+        ax.clear()
         for corps in corps_celestes:
-            if corps.nom != "Soleil":
-                positions_arr = np.array(positions[corps.nom])
-                scatters[corps.nom].set_data(positions_arr[:, 0], positions_arr[:, 1])
+            ax.scatter(corps.position[0], corps.position[1], color=corps.couleur, s=50)
+        return []
 
-        return scatters.values()
-
-    # Créer l'animation
-    ani = FuncAnimation(fig, update, frames=total_steps, init_func=init, blit=True, repeat=False)
-
+    ani = FuncAnimation(fig, update, frames=total_steps, init_func=init, blit=False, repeat=False)
     plt.show()
 
-    # Afficher le tableau des valeurs
-    afficher_tableau(vitesse_moyenne, force_moyenne)
-
-# Fonction pour afficher le tableau des valeurs
-def afficher_tableau(vitesse_moyenne, force_moyenne):
-    fig_tableau = plt.figure(figsize=(16, 6))  # Taille de la figure ajustée pour le tableau
-    table_data = []
-    headers = ["Corps", "Vitesse à 20 jours (km/s)", "Force à 20 jours (N)", "Vitesse à 250 jours (km/s)", "Force à 250 jours (N)"]
-    table_data.append(headers)
-
-    # Remplir les données du tableau
-    for corps in vitesse_moyenne.keys():
-        v_20 = vitesse_moyenne[corps][20]
-        f_20 = force_moyenne[corps][20]
-        v_250 = vitesse_moyenne[corps][250]
-        f_250 = force_moyenne[corps][250]
-        table_data.append([corps, v_20, f_20, v_250, f_250])
-
-    # Créer le tableau
-    plt.table(cellText=table_data, cellLoc='center', loc='center')
-    plt.axis('off')  # Cacher les axes
-    plt.title("Tableau des vitesses et forces à 20 et 250 jours")
-    plt.show()
-
-# Créer la fenêtre principale
+# Créer la fenêtre Tkinter
 root = tk.Tk()
-root.withdraw()  # Cacher la fenêtre principale
+root.withdraw()
 
 # Lancer la simulation
 run_simulation()
 
-# Fermer l'application après la simulation
+# Quitter
 root.destroy()
