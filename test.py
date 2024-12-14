@@ -13,11 +13,16 @@ G = 6.67430e-20  # Constante gravitationnelle en km^3/kg/s^2
 images = {
     "Soleil": 'textures/soleil.png',  # Chemin relatif vers l'image du Soleil
     "Terre": 'textures/earth.png',  # Exemple pour la Terre
+    "Mars": 'textures/mars.png',
+    "Mercure": 'textures/mercure.png',
+    "Jupiter": 'textures/jupiter.png',
+    "Uranus": 'textures/uranus.png',
+    "background": 'textures/background.jpg',  # Image de fond
 }
 
 # Fonction pour convertir l'entrée de l'utilisateur en un nombre flottant
 def convertir_entree_scientifique(entree):
-    entree = re.sub(r'[×x]\s*10\^?', 'e', entree)  # Remplace '× 10^' par 'e'
+    entree = re.sub(r'[×x]\s*10\^?', 'e', entree)  # Remplace 's× 10^' par 'e'
     try:
         return float(entree)
     except ValueError:
@@ -117,10 +122,20 @@ def run_simulation():
     corps_celestes.append(soleil)
 
     # Ajouter les planètes
+    distances = []  # Stocker les distances orbitale pour ajuster les limites de l'axe
     for _ in range(nombre_corps):
         corps = entrer_corps(masse_soleil)  # Passez masse_soleil ici
         if corps:
             corps_celestes.append(corps)
+            distance = np.linalg.norm(corps.position)  # Distance orbitale initiale
+            distances.append(distance)
+
+    # Trouver la distance orbitale maximale
+    distance_max = max(distances) if distances else 1e8  # Valeur par défaut si aucune planète
+
+    # Ajuster les limites dynamiquement avec une marge
+    marge = 1.2  # Marge de 20% pour ne pas coller les bords
+    xlim = ylim = distance_max * marge
 
     # Paramètres de la simulation
     dt = 432000  # Pas de temps (5 jours)
@@ -129,62 +144,58 @@ def run_simulation():
 
     # Tracer des trajectoires avec animation
     fig, ax = plt.subplots(figsize=(16, 9))  # Adapter la taille de la figure pour 1920x1080
-    ax.set_xlim(-1.5e9, 1.5e9)  # Limites x en km
-    ax.set_ylim(-1.5e9, 1.5e9)  # Limites y en km
+    ax.set_xlim(-xlim, xlim)  # Limites x dynamiques
+    ax.set_ylim(-ylim, ylim)  # Limites y dynamiques
+
+    # Charger l'image de fond
+    background_img = Image.open(images["background"])
+    ax.imshow(background_img, extent=[-xlim, xlim, -ylim, ylim], aspect='auto')
+
+    # Enlever le quadrillage
+    ax.grid(False)
+
     ax.set_title('Simulation du système solaire avec trajectoires animées')
     ax.set_xlabel('Position X (km)')
     ax.set_ylabel('Position Y (km)')
-    ax.grid()
+    
+    plt.legend()
 
     # Initialiser les graphiques pour les corps célestes
     scatters = {corps.nom: ax.plot([], [], 'o-', label=corps.nom, markersize=4)[0] for corps in corps_celestes if corps.nom != "Soleil"}
     ax.scatter([0], [0], color='yellow', edgecolor='black', s=300, label='Soleil')
 
-    plt.legend()
-
-    # Ajuster la taille de l'image du Soleil pour correspondre à la taille du point jaune
-    # (point jaune s=300, donc augmenter le zoom pour l'image du Soleil)
-    zoom_soleil = 200 / 195  # Taille du point jaune (300) divisé par la taille actuelle de l'image du Soleil (50)
+    # Ajuster la taille de l'image du Soleil
+    zoom_soleil = 200 / 195
     soleil.offset_image = OffsetImage(soleil.image, zoom=zoom_soleil)
-        
 
     # Liste pour stocker les objets AnnotationBbox
     annotations = []
 
-    # Fonction d'initialisation pour l'animation
     def init():
         for scatter in scatters.values():
             scatter.set_data([], [])
         return scatters.values()
 
-    # Fonction d'animation
     def update(frame):
-        # Mettre à jour les forces et les positions de chaque corps céleste
         for corps in corps_celestes:
             corps.maj_force(corps_celestes)
             corps.maj_position_et_vitesse(dt)
-            positions[corps.nom].append(corps.position.copy())  # Enregistrer la position
+            positions[corps.nom].append(corps.position.copy())
 
-        # Supprimer les anciennes annotations
         for annotation in annotations:
             annotation.remove()
         annotations.clear()
 
-        # Mettre à jour les positions des corps célestes pour l'animation
         for corps in corps_celestes:
             if corps.nom != "Soleil":
-                # Créer l'annotation de l'image à la position actuelle
                 ab = AnnotationBbox(corps.offset_image, corps.position, frameon=False)
                 ax.add_artist(ab)
-                annotations.append(ab)  # Ajouter l'annotation à la liste pour suppression future
+                annotations.append(ab)
 
-        # Ajouter l'image du Soleil à chaque frame
         ab_soleil = AnnotationBbox(soleil.offset_image, soleil.position, frameon=False)
         ax.add_artist(ab_soleil)
-
         return annotations + [ab_soleil]
 
-    # Créer l'animation
     ani = FuncAnimation(fig, update, frames=total_steps, init_func=init, blit=True, repeat=False)
 
     plt.show()
