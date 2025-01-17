@@ -22,6 +22,3 @@ def afficher_tableau(corps_celestes):
     table.set_fontsize(10)
     plt.title("Informations des Corps Célestes", fontsize=14)
     plt.show()
-
-
-    
