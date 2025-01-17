@@ -45,56 +45,56 @@ Fichiers du projet
     main.py : le script principal contenant toute la logique de simulation.
     textures/ : un dossier contenant les images utilisées pour représenter les planètes, le Soleil et l'arrière-plan.
 
-### Utilisation
+### 👍 Utilisation
 
     Exécution du script : Lancez le script Python via votre terminal ou IDE préféré :
 
     python main.py
 
-### Interaction utilisateur :
+### ✋ Interaction utilisateur :
         Une boîte de dialogue vous demande combien de planètes ajouter.
         Entrez les informations pour chaque planète (nom, masse, période orbitale).
         La simulation commence une fois toutes les données saisies.
 
-### Visualisation :
+### 🎨 Visualisation :
         Regardez les planètes évoluer dans leur trajectoire.
         Les trajectoires et positions sont recalculées dynamiquement en fonction des lois de la gravité.
 
-### Affichage des données :
+### 📈 Affichage des données :
         À la fin de la simulation, un tableau récapitule les informations sur les planètes (masse, position, vitesse, distance au Soleil).
 
 ## Calculs scientifiques
 
-### Distance orbitale :
+### 🕐 Distance orbitale :
     La distance orbitale est calculée à partir de la période orbitale donnée par l'utilisateur, en utilisant la troisième loi de Kepler :
     R=(G⋅Msoleil⋅T24π2)1/3
     R=(4π2G⋅Msoleil​⋅T2​)1/3
 
     Où :
         GG : constante gravitationnelle.
-        MsoleilMsoleil​ : masse du Soleil.
+        Msoleil​ : masse du Soleil.
         TT : période orbitale en secondes.
 
-### Vitesse orbitale :
+### ➕ Vitesse orbitale :
     La vitesse initiale d'une planète est calculée pour une orbite circulaire à partir de la formule :
     v=G⋅MsoleilR
     v=RG⋅Msoleil​​
 
     ​
 
-### Mise à jour des positions et vitesses :
+### 📡 Mise à jour des positions et vitesses :
     Les forces gravitationnelles sont calculées pour chaque paire de corps célestes, et les positions/vitesses sont mises à jour via les équations de mouvement :
     F=G⋅m1⋅m2r2
     F=G⋅r2m1​⋅m2​​
 
     Où rr est la distance entre deux corps célestes.
 
-### Interface utilisateur
+### 💻 Interface utilisateur
 
     Tkinter est utilisé pour les boîtes de dialogue interactives.
     Les positions des corps célestes sont affichées via matplotlib.
 
-### Animation
+### 🎥 Animation
 
     L'animation est gérée via FuncAnimation de matplotlib.
     Les images des planètes sont placées dynamiquement sur la carte via OffsetImage et AnnotationBbox.
