@@ -19,6 +19,7 @@ images = {
     "Vénus": 'textures/venus.png',
     "Mercure": 'textures/mercure.png',
     "Jupiter": 'textures/jupiter.png',
+    "Saturne": 'textures/saturne.png',
     "Uranus": 'textures/uranus.png',
     "background": 'textures/background.jpg',  # Image de fond
 }
