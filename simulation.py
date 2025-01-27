@@ -15,6 +15,8 @@ images = {
     "Soleil": 'textures/soleil.png',  # Chemin relatif vers l'image du Soleil
     "Terre": 'textures/earth.png',  # Exemple pour la Terre
     "Mars": 'textures/mars.png',
+    "Venus": 'textures/venus.png',  
+    "Vénus": 'textures/venus.png',
     "Mercure": 'textures/mercure.png',
     "Jupiter": 'textures/jupiter.png',
     "Uranus": 'textures/uranus.png',
